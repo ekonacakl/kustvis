@@ -41,10 +41,11 @@ def build(demo=False, today=None):
         rows = F.demo_spot(spot) if demo else F.fetch_spot(spot)
         ext = A.tide_extremes(rows)
         best = A.best_window(rows, ext, target)
+        day_w, night_w = A.split_windows(rows, ext, target)
         species = A.species_for(spot, target)
         outlook = [(target + timedelta(days=i), A.best_window(rows, ext, target + timedelta(days=i)))
                    for i in range(4)]
-        res = {"spot": spot, "rows": rows, "extremes": ext, "best": best, "outlook": outlook,
+        res = {"spot": spot, "rows": rows, "extremes": ext, "best": best, "night": night_w if night_w is not best else None, "outlook": outlook,
                "species": species, "legal": A.legal_notes(species, rules, target)}
         if best:
             arrive = best["start"] - timedelta(minutes=ARRIVE_BEFORE_WINDOW)

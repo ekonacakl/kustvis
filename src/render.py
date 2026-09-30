@@ -25,6 +25,13 @@ def dag(d, L):
     return x["date"].format(day=x["days"][d.weekday()], d=d.day, m=x["months"][d.month - 1])
 
 
+def part(t, L):
+    """Day-part word for a time, so 04:50 reads as 'night', not ambiguous."""
+    h = t.hour
+    i = 0 if h < 6 else 1 if h < 12 else 2 if h < 18 else 3 if h < 23 else 0
+    return T[L]["part"][i]
+
+
 def verdict(score, unsafe, L):
     x = T[L]
     if unsafe:       return x["v_unsafe"]
@@ -61,8 +68,13 @@ def telegram(rep, L="nl", site_url=""):
         b, s = r["best"], r["spot"]
         lines.append("")
         lines.append(f"<b>{E(text(s['name'], L))}</b>: {b['score']}/10 · {verdict(b['score'], b['unsafe'], L)}")
-        lines.append(x["tg_window"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"])))
+        lines.append(x["tg_window"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"]),
+                                           part=part(b["start"], L)))
         lines.append(x["tg_cond"].format(w=round(b["wind"]), wave=f"{b['wave']:.1f}", dp=f"{b['dp']:+}"))
+        n = r.get("night")
+        if n:
+            lines.append(x["tg_night"].format(hw=hm(n["hw"]["time"]), s=hm(n["start"]), e=hm(n["end"]),
+                                              part=part(n["start"], L), sc=n["score"]))
         if r["species"]:
             lines.append(f"🐟 {species_list(r, L)}")
         if i == 0 and r.get("departures"):
@@ -191,6 +203,7 @@ def page(rep, L="nl"):
         meta = x["meta"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"]), r=b["range"] or "?")
         out.append(f"""<li class="spot"><div class="head"><h3>{E(text(s['name'], L))}</h3>{score_bar(b['score'], b['unsafe'])}</div>
 <p class="meta">{E(meta)}</p>
+{f'<p class="meta">🌙 {E(x["night_meta"].format(hw=hm(r["night"]["hw"]["time"]), s=hm(r["night"]["start"]), e=hm(r["night"]["end"]), sc=r["night"]["score"]))}</p>' if r.get("night") else ''}
 {tide_svg(r, t, L, h=70)}
 <p><b>{x['fish']}:</b> {E(species_list(r, L) or x['no_fish'])}</p>
 <p class="tip">{E(text(s['tips'], L))}</p>

@@ -93,16 +93,34 @@ def score_window(rows, hw, trange):
             "start": t - timedelta(hours=2), "end": t + timedelta(hours=1)}
 
 
-def best_window(rows, extremes, day):
+def day_windows(rows, extremes, day):
+    """Score every high-water window of the day and tag it as daylight or not."""
     trange = tidal_range(extremes, day)
-    cands = []
+    out = []
     for e in extremes:
         if e["kind"] == "HW" and e["time"].date() == day:
             c = score_window(rows, e, trange)
             if c:
+                win = [r for r in rows if c["start"] <= r["time"] <= c["end"]]
                 c["hw"], c["range"] = e, trange
-                cands.append(c)
-    return max(cands, key=lambda c: c["score"]) if cands else None
+                c["daylight"] = sum(r["is_day"] for r in win) / len(win) >= 0.5
+                out.append(c)
+    return out
+
+
+def split_windows(rows, extremes, day):
+    """(daytime, night): the best daylight window and the best night window.
+    Most people fish in daylight, so daytime is the main recommendation;
+    the night window is shown as an alternative."""
+    ws = day_windows(rows, extremes, day)
+    best = lambda xs: max(xs, key=lambda c: c["score"]) if xs else None
+    return best([w for w in ws if w["daylight"]]), best([w for w in ws if not w["daylight"]])
+
+
+def best_window(rows, extremes, day):
+    """Main recommendation: the daylight window, or the night one if there is none."""
+    d, n = split_windows(rows, extremes, day)
+    return d or n
 
 
 # ---------- species & rules ----------
