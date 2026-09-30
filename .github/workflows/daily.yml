@@ -1,0 +1,47 @@
+name: Daily bulletin
+
+on:
+  schedule:
+    # 18:00 UTC = 20:00 Brussels in summer, 19:00 in winter
+    - cron: "0 18 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build page and send bulletin
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_NL: ${{ secrets.TELEGRAM_CHAT_ID_NL }}
+          TELEGRAM_CHAT_ID_EN: ${{ secrets.TELEGRAM_CHAT_ID_EN }}
+          TELEGRAM_CHAT_ID_FR: ${{ secrets.TELEGRAM_CHAT_ID_FR }}
+          TELEGRAM_CHAT_ID_TR: ${{ secrets.TELEGRAM_CHAT_ID_TR }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: python src/main.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
