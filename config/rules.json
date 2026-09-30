@@ -1,0 +1,49 @@
+{
+  "_note": "Recreational sea fishing rules, Belgian coast, 2026. Source: recreatievezeevisserij.be and Departement Landbouw en Zeevisserij. Re-check every January; EU rules change yearly. Texts shown to users are translated in src/i18n.py.",
+  "year": 2026,
+  "sources": [
+    {
+      "title": "Recreatieve Zeevisserij – baglimiet zeebaars 2026",
+      "url": "https://www.recreatievezeevisserij.be"
+    },
+    {
+      "title": "Brochure Recreatieve visserij aan de Belgische kust 2026",
+      "url": "https://www.recreatievezeevisserij.be"
+    },
+    {
+      "title": "Minimummaten (volledige lijst)",
+      "url": "https://www.recreatievezeevisserij.be"
+    }
+  ],
+  "species": {
+    "zeebaars": {
+      "min_size_cm": 42,
+      "bag_limit_per_day": 3,
+      "no_retention_months": [
+        2,
+        3
+      ],
+      "recfishing_registration": true,
+      "extra": "Geen vaste netten. Beschermingszones in Oostende en Zeebrugge: controleer de exacte zone vóór je vist."
+    },
+    "paling": {
+      "recfishing_registration": true,
+      "extra": "Registratie in RecFishing verplicht. Raadpleeg de brochure voor bijkomende beperkingen."
+    },
+    "tong": {
+      "extra": "Zie minimummatenlijst."
+    },
+    "wijting": {
+      "extra": "Zie minimummatenlijst."
+    },
+    "gul": {
+      "extra": "Zie minimummatenlijst."
+    },
+    "schar": {
+      "extra": "Zie minimummatenlijst."
+    },
+    "makreel": {
+      "extra": "Zie minimummatenlijst."
+    }
+  }
+}

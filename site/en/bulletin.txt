@@ -1,0 +1,21 @@
+🎣 <b>Shore fishing forecast for Thursday 1 Oct</b>
+<i>(test data)</i>
+
+<b>Nieuwpoort – pier &amp; Yser mouth</b>: 8.0/10 · Very good
+🌊 High water 12:14 · best window 10:14–13:14
+💨 Wind 19 km/h, waves 1.2 m, pressure -2.2 hPa/6h
+🐟 sea bass, sole, eel, mackerel
+🚗 Leave (incl. 20 min for bait): Brussels 07:55 · Leuven 07:37 · Antwerp 07:56 · Ghent 08:33 · Bruges 09:01
+
+<b>Raversijde – groynes</b>: 8.0/10 · Very good
+🌊 High water 12:09 · best window 10:09–13:09
+💨 Wind 19 km/h, waves 1.2 m, pressure -2.2 hPa/6h
+🐟 sea bass, sole
+
+<b>Oostende – western pier</b>: 8.0/10 · Very good
+🌊 High water 12:07 · best window 10:07–13:07
+💨 Wind 19 km/h, waves 1.2 m, pressure -2.2 hPa/6h
+🐟 sea bass, sole, mackerel
+
+📱 Sea bass and eel: log your catch in RecFishing.
+<i>Indicative only. Check official tide tables and conditions on site.</i>

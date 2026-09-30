@@ -1,0 +1,232 @@
+{
+  "_note": "Coordinates are approximate. 'name' and 'tips' are per language (nl, en, fr, tr). Species use the Dutch key; translations live in src/i18n.py.",
+  "spots": [
+    {
+      "id": "nieuwpoort",
+      "name": {
+        "nl": "Nieuwpoort – staketsel & IJzermonding",
+        "en": "Nieuwpoort – pier & Yser mouth",
+        "fr": "Nieuport – estacade & embouchure de l'Yser",
+        "tr": "Nieuwpoort – iskele ve IJzer ağzı"
+      },
+      "lat": 51.155,
+      "lon": 2.723,
+      "type": "pier",
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong",
+          "paling",
+          "makreel"
+        ],
+        "winter": [
+          "wijting",
+          "gul"
+        ]
+      },
+      "tips": {
+        "nl": "Over hoog water vissen, niet te ver werpen: vis zwemt tussen de stenen. Schuiflood, zagers of krab.",
+        "en": "Fish over high water and don't cast too far: fish feed between the rocks. Running lead, ragworm or crab.",
+        "fr": "Pêchez autour de la pleine mer sans lancer trop loin : le poisson chasse entre les pierres. Plomb coulissant, néréis ou crabe.",
+        "tr": "Yüksek su civarında avlanın, çok uzağa atmayın: balık taşların arasında. Kayar kurşun, kum kurdu veya yengeç."
+      }
+    },
+    {
+      "id": "raversijde",
+      "name": {
+        "nl": "Raversijde – golfbrekers",
+        "en": "Raversijde – groynes",
+        "fr": "Raversijde – brise-lames",
+        "tr": "Raversijde – dalgakıranlar"
+      },
+      "lat": 51.205,
+      "lon": 2.848,
+      "type": "beach",
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Golfbrekers geven structuur. Opkomend water is vaak het beste moment.",
+        "en": "The groynes give structure. The rising tide is often the best moment.",
+        "fr": "Les brise-lames créent de la structure. La marée montante est souvent le meilleur moment.",
+        "tr": "Dalgakıranlar balığı toplar. Yükselen su genelde en iyi zamandır."
+      }
+    },
+    {
+      "id": "oostende-west",
+      "name": {
+        "nl": "Oostende – Westerstaketsel",
+        "en": "Oostende – western pier",
+        "fr": "Ostende – estacade ouest",
+        "tr": "Oostende – batı iskelesi"
+      },
+      "lat": 51.2365,
+      "lon": 2.9205,
+      "type": "pier",
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong",
+          "makreel"
+        ],
+        "winter": [
+          "wijting",
+          "gul"
+        ]
+      },
+      "tips": {
+        "nl": "Let op beschermingszone zeebaars in de havenzone (zie regels).",
+        "en": "Mind the sea bass protection zone in the harbour area (see rules).",
+        "fr": "Attention à la zone de protection du bar dans le port (voir réglementation).",
+        "tr": "Liman bölgesindeki levrek koruma alanına dikkat edin (kurallara bakın)."
+      }
+    },
+    {
+      "id": "oostende-oost",
+      "name": {
+        "nl": "Oostende – Oosteroever / vaargeul",
+        "en": "Oostende – east bank / channel",
+        "fr": "Ostende – rive est / chenal",
+        "tr": "Oostende – doğu yakası / kanal"
+      },
+      "lat": 51.2375,
+      "lon": 2.931,
+      "type": "pier",
+      "species": {
+        "summer": [
+          "paling",
+          "tong",
+          "zeebaars"
+        ],
+        "winter": [
+          "wijting",
+          "gul"
+        ]
+      },
+      "tips": {
+        "nl": "Vaargeul aan de oostkant. Zagers of krab, dicht bij de stenen.",
+        "en": "Channel on the east side. Ragworm or crab, close to the rocks.",
+        "fr": "Chenal côté est. Néréis ou crabe, près des pierres.",
+        "tr": "Doğu taraftaki kanal. Kum kurdu veya yengeç, taşlara yakın."
+      }
+    },
+    {
+      "id": "blankenberge",
+      "name": {
+        "nl": "Blankenberge – pier & staketsel",
+        "en": "Blankenberge – pier",
+        "fr": "Blankenberge – pier & estacade",
+        "tr": "Blankenberge – iskele"
+      },
+      "lat": 51.317,
+      "lon": 3.13,
+      "type": "pier",
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong",
+          "makreel"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Controleer vooraf waar op de pier vissen toegelaten is.",
+        "en": "Check beforehand where fishing is allowed on the pier.",
+        "fr": "Vérifiez à l'avance où la pêche est autorisée sur le pier.",
+        "tr": "İskelenin neresinde balık tutmaya izin verildiğini önceden kontrol edin."
+      }
+    },
+    {
+      "id": "zeebrugge-west",
+      "name": {
+        "nl": "Zeebrugge – westelijke havendam",
+        "en": "Zeebrugge – western harbour wall",
+        "fr": "Zeebruges – digue ouest du port",
+        "tr": "Zeebrugge – batı liman mendireği"
+      },
+      "lat": 51.34,
+      "lon": 3.185,
+      "type": "harbour_wall",
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong"
+        ],
+        "winter": [
+          "wijting",
+          "gul"
+        ]
+      },
+      "tips": {
+        "nl": "Diep water en stroming: zwaarder materiaal en een lang schepnet. Let op scheepvaart.",
+        "en": "Deep water and strong current: heavier tackle and a long landing net. Watch for shipping.",
+        "fr": "Eau profonde et courant : matériel plus lourd et épuisette à long manche. Attention aux navires.",
+        "tr": "Derin su ve akıntı: daha ağır takım ve uzun kepçe. Gemi trafiğine dikkat."
+      }
+    }
+  ],
+  "origins": [
+    {
+      "name": {
+        "nl": "Brussel",
+        "en": "Brussels",
+        "fr": "Bruxelles",
+        "tr": "Brüksel"
+      },
+      "lat": 50.846,
+      "lon": 4.352
+    },
+    {
+      "name": {
+        "nl": "Leuven",
+        "en": "Leuven",
+        "fr": "Louvain",
+        "tr": "Leuven"
+      },
+      "lat": 50.879,
+      "lon": 4.701
+    },
+    {
+      "name": {
+        "nl": "Antwerpen",
+        "en": "Antwerp",
+        "fr": "Anvers",
+        "tr": "Anvers"
+      },
+      "lat": 51.219,
+      "lon": 4.402
+    },
+    {
+      "name": {
+        "nl": "Gent",
+        "en": "Ghent",
+        "fr": "Gand",
+        "tr": "Gent"
+      },
+      "lat": 51.054,
+      "lon": 3.717
+    },
+    {
+      "name": {
+        "nl": "Brugge",
+        "en": "Bruges",
+        "fr": "Bruges",
+        "tr": "Brugge"
+      },
+      "lat": 51.209,
+      "lon": 3.225
+    }
+  ]
+}

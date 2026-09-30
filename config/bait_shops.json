@@ -1,0 +1,17 @@
+{
+  "_note": "Fill this in by hand. Hours use 24h 'HH:MM-HH:MM', or null when closed. Only shops with a 'name' are shown. Keep one entry per shop.",
+  "shops": [
+    {
+      "name": "",
+      "town": "Oostende",
+      "lat": null, "lon": null,
+      "fresh_bait": ["zagers", "zeepieren"],
+      "hours": {
+        "mon": null, "tue": null, "wed": null, "thu": null,
+        "fri": null, "sat": null, "sun": null
+      },
+      "phone": "",
+      "last_checked": ""
+    }
+  ]
+}
