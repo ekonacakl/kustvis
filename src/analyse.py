@@ -234,6 +234,18 @@ def gear_tips(win, rows, species, night=None):
             else:            tips.append(("zeebaars", "t_bass_rough", {}))
         if clarity:
             tips.append(("zeebaars", "t_clear" if clarity == "clear" else "t_murky", {}))
+        # Spinning: lure type and weight follow wind, waves and light.
+        wind, wdir = win.get("wind"), win.get("wdir")
+        onshore = wdir is not None and abs((wdir - SEA_BEARING + 180) % 360 - 180) < 60
+        tips.append(("zeebaars", "t_spin_rod", {}))
+        if wave is not None and wind is not None:
+            low_light = (win.get("dark") or 0) > 0.1 or (win.get("cloud") or 0) >= 70
+            if wind >= 25 and onshore:  tips.append(("zeebaars", "t_lure_spoon", {"w": round(wind)}))
+            elif wave >= 1.4:           tips.append(("zeebaars", "t_lure_deep", {}))
+            elif wave < 0.4 and wind < 15:
+                tips.append(("zeebaars", "t_lure_surface" if low_light else "t_lure_minnow", {}))
+            elif wind >= 18:            tips.append(("zeebaars", "t_lure_jig", {"w": round(wind)}))
+            else:                       tips.append(("zeebaars", "t_lure_shad", {}))
     if "tong" in species:
         if wave is not None:
             tips.append(("tong", "t_sole_good" if wave < 0.8 else "t_sole_poor", {}))
