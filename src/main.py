@@ -36,22 +36,24 @@ def build(demo=False, today=None):
     spots_cfg, rules, shops = load("spots.json"), load("rules.json"), load("bait_shops.json")["shops"]
     today = today or datetime.now(LOCAL).date()
     target = today + timedelta(days=1)
-    results = []
+    results, skipped = [], []
     for spot in spots_cfg["spots"]:
         try:
             rows = F.demo_spot(spot) if demo else F.fetch_spot(spot)
         except Exception as e:  # one spot failing must not stop the bulletin
             print(f"SKIP {spot['id']}: no data ({e})", flush=True)
+            skipped.append(spot)
             continue
         ext = A.tide_extremes(rows)
-        best = A.best_window(rows, ext, target)
-        day_w, night_w = A.split_windows(rows, ext, target)
+        best = A.best_window(rows, ext, target, spot)
+        day_w, night_w = A.split_windows(rows, ext, target, spot)
         species = A.species_for(spot, target)
-        outlook = [(target + timedelta(days=i), A.best_window(rows, ext, target + timedelta(days=i)))
+        outlook = [(target + timedelta(days=i), A.best_window(rows, ext, target + timedelta(days=i), spot))
                    for i in range(4)]
         res = {"spot": spot, "rows": rows, "extremes": ext, "best": best, "night": night_w if night_w is not best else None, "outlook": outlook,
                "species": species, "legal": A.legal_notes(species, rules, target)}
         if best:
+            res["tips"] = A.gear_tips(best, rows, species, res["night"])
             arrive = best["start"] - timedelta(minutes=ARRIVE_BEFORE_WINDOW)
             res["departures"] = A.departures(spots_cfg["origins"], spot, arrive, BAIT_STOP_MIN)
             res["shops"] = A.shops_open(shops, arrive - timedelta(minutes=45))
@@ -60,7 +62,7 @@ def build(demo=False, today=None):
         raise SystemExit("No data for any spot: Open-Meteo unreachable. Nothing sent.")
     results.sort(key=lambda r: r["best"]["score"] if r["best"] else -1, reverse=True)
     return {"generated": datetime.now(LOCAL).replace(tzinfo=None), "today": today, "target": target, "results": results,
-            "rules": rules, "demo": demo}
+            "rules": rules, "demo": demo, "skipped": skipped}
 
 
 def chat_ids():

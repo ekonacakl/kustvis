@@ -57,6 +57,52 @@ def short_name(spot, L):
     return text(spot["name"], L).split(" –")[0]
 
 
+def compass(deg, L):
+    return "" if deg is None else T[L]["compass"][int((deg + 22.5) // 45) % 8]
+
+
+def num(v, fmt="{:.1f}"):
+    return "–" if v is None else fmt.format(v)
+
+
+def sc(v):
+    """6.0 -> '6', 6.5 -> '6.5'"""
+    return f"{v:g}"
+
+
+def factor(k, p, L):
+    x, p = T[L], dict(p)
+    if "rel" in p:
+        p["rel"] = f", {x['rel'][p['rel']]}" if p["rel"] else ""
+    return x[k].format(**p)
+
+
+def tip(tp, L):
+    return T[L][tp[1]].format(**tp[2])
+
+
+def maps_url(spot):
+    return f"https://www.google.com/maps/dir/?api=1&destination={spot['lat']},{spot['lon']}"
+
+
+def missing_lines(rep, L):
+    """Footnotes: which inputs were missing, and which spots returned no data."""
+    x, out = T[L], []
+    miss = []
+    for r in rep["results"]:
+        for w in (r.get("best"), r.get("night")):
+            for k in (w or {}).get("missing", []):
+                if x["var"][k] not in miss:
+                    miss.append(x["var"][k])
+        if not r.get("best") and x["var"]["sea_level_height_msl"] not in miss:
+            miss.append(x["var"]["sea_level_height_msl"])
+    if miss:
+        out.append(x["missing_note"].format(list=", ".join(miss)))
+    if rep.get("skipped"):
+        out.append(x["skipped_note"].format(list="; ".join(text(s["name"], L) for s in rep["skipped"])))
+    return out
+
+
 # ---------------- Telegram ----------------
 
 def telegram(rep, L="nl", site_url=""):
@@ -67,16 +113,23 @@ def telegram(rep, L="nl", site_url=""):
     for i, r in enumerate([r for r in rep["results"] if r["best"]][:3]):
         b, s = r["best"], r["spot"]
         lines.append("")
-        lines.append(f"<b>{E(text(s['name'], L))}</b>: {b['score']}/10 · {verdict(b['score'], b['unsafe'], L)}")
+        lines.append(f"<b>{E(text(s['name'], L))}</b>: {sc(b['score'])}/10 · {verdict(b['score'], b['unsafe'], L)}")
         lines.append(x["tg_window"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"]),
                                            part=part(b["start"], L)))
-        lines.append(x["tg_cond"].format(w=round(b["wind"]), wave=f"{b['wave']:.1f}", dp=f"{b['dp']:+}"))
+        lines.append(x["tg_cond"].format(w=num(b["wind"], "{:.0f}"), dir=compass(b["wdir"], L), wave=num(b["wave"]),
+                                         c=num(b["cloud"], "{:.0f}"), dp=f"{b['dp']:+}"))
         n = r.get("night")
         if n:
             lines.append(x["tg_night"].format(hw=hm(n["hw"]["time"]), s=hm(n["start"]), e=hm(n["end"]),
-                                              part=part(n["start"], L), sc=n["score"]))
+                                              part=part(n["start"], L), sc=sc(n["score"])))
         if r["species"]:
             lines.append(f"🐟 {species_list(r, L)}")
+        if i == 0:
+            for tp in r.get("tips", []):
+                if tp[1] != "t_sole_night":
+                    who = "🎒" if tp[0] == "all" else f"🎒 {sp(tp[0], L).capitalize()}:"
+                    lines.append(f"{who} {E(tip(tp, L))}")
+        lines.append(f'<a href="{maps_url(s)}">{x["tg_route"]}</a>')
         if i == 0 and r.get("departures"):
             dep = " · ".join(f"{text(d['from'], L)} {hm(d['leave'])}" for d in r["departures"])
             lines.append(x["tg_leave"].format(n=BAIT_MIN, list=dep))
@@ -88,7 +141,7 @@ def telegram(rep, L="nl", site_url=""):
         for r in rep["results"][:3]:
             we = [(d, b) for d, b in r["outlook"] if d.weekday() in (5, 6) and b]
             if we:
-                parts = [f"{x['days_short'][d.weekday()]} {b['score']}" for d, b in we]
+                parts = [f"{x['days_short'][d.weekday()]} {sc(b['score'])}" for d, b in we]
                 lines.append(f"· {E(short_name(r['spot'], L))}: " + ", ".join(parts))
     closed = []
     for r in rep["results"]:
@@ -102,6 +155,8 @@ def telegram(rep, L="nl", site_url=""):
         url = site_url.rstrip("/") + ("/" if L == "nl" else f"/{L}/")
         lines.append(f'<a href="{url}">{x["tg_link"]}</a>')
     lines.append(f"<i>{x['tg_disclaimer']}</i>")
+    for m in missing_lines(rep, L):
+        lines.append(f"<i>ⓘ {E(m)}</i>")
     return "\n".join(lines)
 
 
@@ -145,7 +200,7 @@ def tide_svg(r, day, L, w=720, h=150, big=False):
 
 def score_bar(score, unsafe):
     cls = "bad" if unsafe or score < 4 else "mid" if score < 6 else "good"
-    return f'<span class="score {cls}"><b>{score:.1f}</b><span>/10</span></span>'
+    return f'<span class="score {cls}"><b>{score:g}</b><span>/10</span></span>'
 
 
 def lang_switch(L, prefix):
@@ -177,7 +232,7 @@ def page(rep, L="nl"):
     if top:
         b, s = top["best"], top["spot"]
         why = x["why"].format(verdict=verdict(b["score"], b["unsafe"], L), hw=hm(b["hw"]["time"]),
-                              w=round(b["wind"]), wave=f"{b['wave']:.1f}")
+                              w=num(b["wind"], "{:.0f}"), dir=compass(b["wdir"], L), wave=num(b["wave"]))
         out.append(f"""<section class="hero">
 <p class="when">{E(x['tomorrow'].format(date=dag(t, L)))}</p>
 <h1>{E(text(s['name'], L))}<br><span class="win-t">{hm(b['start'])}–{hm(b['end'])}</span></h1>
@@ -192,21 +247,30 @@ def page(rep, L="nl"):
             out.append(f'</tbody></table><p class="note">{E(x["dep_note"])}</p>')
         out.append("</section>")
 
-    out.append(f'<section><h2>{E(x["all_spots"])}</h2><ol class="spots">')
+    targets = [k for k in ("zeebaars", "tong") if any(k in r["species"] for r in res)]
+    chips = "".join(f'<button type="button" data-t="{k}" aria-pressed="{"true" if k == "all" else "false"}">{E(lab)}</button>'
+                    for k, lab in [("all", x["all"])] + [(k, sp(k, L).capitalize()) for k in targets])
+    out.append(f'<section><h2>{E(x["all_spots"])}</h2>'
+               + (f'<div class="target" role="group" aria-label="{A(x["target"])}"><span>{E(x["target"])}</span>{chips}</div>' if targets else "")
+               + '<ol class="spots">')
     for r in res:
         b, s = r["best"], r["spot"]
-        factors = "".join(f"<li><span>{E(x[k].format(**p))}</span><span>{pt:+.1f}</span></li>" for k, p, pt in b["factors"])
+        factors = "".join(f"<li><span>{E(factor(k, p, L))}</span><span>{pt:+.1f}</span></li>" for k, p, pt in b["factors"])
         outlook = "".join(
             f'<li><span>{x["days_short"][d.weekday()]}</span>{score_bar(o["score"], o["unsafe"]) if o else "–"}</li>'
             for d, o in r["outlook"])
         legal = "".join(f"<li>{E(note(n, L))}</li>" for n in r["legal"])
+        tips = "".join(f'<li data-sp="{tp[0]}">{"" if tp[0] == "all" else "<b>" + E(sp(tp[0], L).capitalize()) + ":</b> "}{E(tip(tp, L))}</li>'
+                       for tp in r.get("tips", []))
         meta = x["meta"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"]), r=b["range"] or "?")
         out.append(f"""<li class="spot"><div class="head"><h3>{E(text(s['name'], L))}</h3>{score_bar(b['score'], b['unsafe'])}</div>
 <p class="meta">{E(meta)}</p>
-{f'<p class="meta">🌙 {E(x["night_meta"].format(hw=hm(r["night"]["hw"]["time"]), s=hm(r["night"]["start"]), e=hm(r["night"]["end"]), sc=r["night"]["score"]))}</p>' if r.get("night") else ''}
+{f'<p class="meta">🌙 {E(x["night_meta"].format(hw=hm(r["night"]["hw"]["time"]), s=hm(r["night"]["start"]), e=hm(r["night"]["end"]), sc=sc(r["night"]["score"])))}</p>' if r.get("night") else ''}
 {tide_svg(r, t, L, h=70)}
 <p><b>{x['fish']}:</b> {E(species_list(r, L) or x['no_fish'])}</p>
 <p class="tip">{E(text(s['tips'], L))}</p>
+{f'<div class="gear"><h4>{E(x["gear"])}</h4><ul>{tips}</ul></div>' if tips else ''}
+<p><a class="btn" href="{maps_url(s)}" target="_blank" rel="noopener">{E(x['route'])}</a></p>
 <details><summary>{E(x['why_score'])}</summary><ul class="factors">{factors}</ul></details>
 {f'<ul class="legal">{legal}</ul>' if legal else ''}
 <ul class="outlook" aria-label="{A(x['coming_days'])}">{outlook}</ul></li>""")
@@ -225,10 +289,20 @@ def page(rep, L="nl"):
 <p class="note">{E(x['months_note'])} {E(x['bass_extra'])}</p></div>
 <ul>{gen_rules}</ul>
 <p class="note">{x['source'].format(link=link)}</p></section>
-<footer><p>{E(x['footer'])}</p></footer>
-</main></body></html>""")
+<footer><p>{E(x['footer'])}</p><p>{E(x['gear_note'])}</p>{"".join(f"<p>ⓘ {E(m)}</p>" for m in missing_lines(rep, L))}</footer>
+</main><script>{JS}</script></body></html>""")
     return "\n".join(out)
 
+
+JS = """
+(function(){var b=document.querySelectorAll('.target button');if(!b.length)return;
+function set(t){document.body.setAttribute('data-target',t);
+for(var i=0;i<b.length;i++)b[i].setAttribute('aria-pressed',b[i].getAttribute('data-t')===t?'true':'false');
+try{localStorage.setItem('kustvis-target',t)}catch(e){}}
+for(var i=0;i<b.length;i++)b[i].addEventListener('click',function(){set(this.getAttribute('data-t'))});
+var s='all';try{s=localStorage.getItem('kustvis-target')||'all'}catch(e){}
+if(!document.querySelector('.target button[data-t="'+s+'"]'))s='all';set(s);})();
+"""
 
 CSS = """
 :root{--sea:#1F3A44;--foam:#EEF2F0;--paper:#FFFFFF;--sand:#C9B98F;--buoy:#F2C230;--kelp:#3F6B47;--rust:#A4452C;--ink:#172a31;--muted:#5b6d72;--line:#d5ddda}
@@ -292,4 +366,14 @@ footer{margin-top:36px;border-top:1px solid var(--line);font-size:13px;color:var
 a{color:var(--sea)}
 a:focus-visible,summary:focus-visible{outline:3px solid var(--buoy);outline-offset:2px}
 @media (max-width:520px){.dep th:nth-child(2),.dep td:nth-child(2){display:none}.months span{font-size:11px}}
+.target{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px}
+.target span{font-weight:500;color:var(--muted);font-size:15px}
+.target button{font:600 15px Barlow,sans-serif;padding:6px 14px;border:2px solid var(--sea);background:transparent;color:var(--sea);border-radius:999px;cursor:pointer}
+.target button[aria-pressed=true]{background:var(--sea);color:var(--foam)}
+.target button:focus-visible,.btn:focus-visible{outline:3px solid var(--buoy);outline-offset:2px}
+.gear{background:var(--foam);padding:8px 12px;margin:8px 0}
+.gear h4{margin:0 0 4px;font:600 15px Barlow,sans-serif}
+.gear ul{margin:0;padding-left:18px;font-size:15px}
+body[data-target=zeebaars] .gear li[data-sp=tong],body[data-target=tong] .gear li[data-sp=zeebaars]{display:none}
+.btn{display:inline-block;font-weight:600;font-size:15px;text-decoration:none;background:var(--sea);color:var(--foam);padding:8px 14px;border-radius:4px}
 """

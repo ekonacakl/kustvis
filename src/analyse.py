@@ -57,73 +57,190 @@ def pressure_trend(rows, t, hours=6):
     return round(now["pressure_msl"] - before["pressure_msl"], 1)
 
 
-def score_window(rows, hw, trange):
-    """Score the fishing window from HW-2h to HW+1h (0..10)."""
+SEA_BEARING = 320  # the Belgian coast faces roughly north-west
+USED_VARS = ["sea_level_height_msl", "wave_height", "wind_speed_10m", "wind_direction_10m",
+             "cloud_cover", "pressure_msl", "is_day"]
+WEIGHTS = {"wave": 2.5, "tide": 2.5, "wind": 2.0, "cloud": 1.0, "pressure": 1.0, "light": 1.0}
+
+
+def _vals(window, key):
+    return [r[key] for r in window if r.get(key) is not None]
+
+
+def _mean_dir(degs):
+    x = sum(math.cos(math.radians(d)) for d in degs)
+    y = sum(math.sin(math.radians(d)) for d in degs)
+    return math.degrees(math.atan2(y, x)) % 360
+
+
+def half(x):
+    """Round to the nearest 0.5 so scores read as 6, 6.5, 7 instead of 6.2."""
+    return round(x * 2) / 2
+
+
+def score_window(rows, hw, trange, spot=None):
+    """Score the window HW-2h..HW+1h from 0 to 10 (steps of 0.5).
+
+    Six parts, each worth a fixed share: waves 2.5, tide 2.5, wind 2, cloud 1,
+    pressure 1, light 1. Spot type matters: an open beach wants some surf, a pier
+    or harbour wall is more forgiving. A missing input counts as neutral (half
+    its share) and is reported in c["missing"]."""
     t = hw["time"]
     window = [r for r in rows if t - timedelta(hours=2) <= r["time"] <= t + timedelta(hours=1)]
     if not window:
         return None
-    wave = max(r["wave_height"] or 0 for r in window)
-    wind = max(r["wind_speed_10m"] or 0 for r in window)
-    gust = max(r["wind_gusts_10m"] or 0 for r in window)
-    dp = pressure_trend(rows, t)
-    dark = sum(1 for r in window if r["is_day"] == 0) / len(window)
+    kind = (spot or {}).get("type", "beach")
+    bearing = (spot or {}).get("sea_bearing", SEA_BEARING)
+    missing = [k for k in USED_VARS if not _vals(window, k)]
+    f = []  # (text key, params, points)
 
-    f = []  # (text key, params, points): rendered in the reader's language later
-    if wave < 0.3:   f.append(("f_flat", {}, 0.5))
-    elif wave < 1.5: f.append(("f_surf", {}, 2.5))
-    elif wave < 2.2: f.append(("f_big", {}, 1.0))
-    else:            f.append(("f_toohigh", {}, -2.0))
-    if wind < 20:    f.append(("f_calm", {}, 2.0))
-    elif wind < 32:  f.append(("f_breeze", {}, 1.0))
-    else:            f.append(("f_strong", {}, -1.5))
-    # Current / tidal range: "geen stroming, geen vis"
-    if trange is not None:
-        if trange > 4.3:   f.append(("f_spring", {}, 2.0))
-        elif trange > 3.6: f.append(("f_mean", {}, 1.2))
-        else:              f.append(("f_neap", {}, 0.4))
-    # Pressure: stable or slowly falling is usually better than a sharp rise.
+    def add(part, key, value, **params):
+        f.append((key, params, round(WEIGHTS[part] * value, 1)))
+
+    # --- waves
+    wv = _vals(window, "wave_height")
+    wave = max(wv) if wv else None
+    if wave is None:
+        add("wave", "f_nodata_wave", 0.5)
+    elif kind == "beach":
+        if wave < 0.3:   add("wave", "f_flat", 0.3)
+        elif wave < 0.5: add("wave", "f_light_surf", 0.7)
+        elif wave < 1.4: add("wave", "f_surf", 1.0)
+        elif wave < 2.0: add("wave", "f_big", 0.5)
+        else:            add("wave", "f_toohigh", 0.0)
+    else:  # pier / harbour wall: deeper water, less dependent on surf
+        if wave < 0.3:   add("wave", "f_flat", 0.6)
+        elif wave < 1.2: add("wave", "f_surf", 1.0)
+        elif wave < 1.8: add("wave", "f_big", 0.6)
+        else:            add("wave", "f_toohigh", 0.1)
+
+    # --- tide: "geen stroming, geen vis"
+    if trange is None:
+        add("tide", "f_nodata_tide", 0.5)
+    else:
+        v = max(0.2, min(1.0, (trange - 2.8) / (4.6 - 2.8)))
+        key = "f_spring" if trange > 4.3 else "f_mean" if trange > 3.6 else "f_neap"
+        add("tide", key, v, r=f"{trange:.1f}")
+
+    # --- wind: speed, and direction relative to the coast
+    ws = _vals(window, "wind_speed_10m")
+    wind = max(ws) if ws else None
+    gust = max(_vals(window, "wind_gusts_10m") or [0])
+    wd = _vals(window, "wind_direction_10m")
+    wdir = _mean_dir(wd) if wd else None
+    if wind is None:
+        add("wind", "f_nodata_wind", 0.5)
+    else:
+        v = 1.0 if wind < 12 else 0.85 if wind < 20 else 0.6 if wind < 28 else 0.3 if wind < 38 else 0.0
+        key = "f_calm" if wind < 20 else "f_breeze" if wind < 32 else "f_strong"
+        rel = None
+        if wdir is not None:
+            diff = abs((wdir - bearing + 180) % 360 - 180)
+            rel = "onshore" if diff < 60 else "offshore" if diff > 120 else "cross"
+            if rel == "onshore" and wind >= 25:
+                v -= 0.25 if kind == "beach" else 0.35   # casting into the wind, exposed walls
+            elif rel == "offshore" and 8 <= wind < 30:
+                v += 0.1                                  # wind in the back: easy casting
+        add("wind", key, max(0.0, min(1.0, v)), w=round(wind), rel=rel)
+
+    # --- cloud cover and light
+    il = _vals(window, "is_day")
+    dark = sum(1 for d in il if d == 0) / len(il) if il else None
+    cc = _vals(window, "cloud_cover")
+    cloud = sum(cc) / len(cc) if cc else None
+    if cloud is None:
+        add("cloud", "f_nodata_cloud", 0.5)
+    elif dark is not None and dark >= 0.9:
+        add("cloud", "f_cloud_night", 0.7, c=round(cloud))
+    elif cloud >= 70: add("cloud", "f_overcast", 1.0, c=round(cloud))
+    elif cloud >= 30: add("cloud", "f_partly", 0.6, c=round(cloud))
+    else:             add("cloud", "f_sunny", 0.3, c=round(cloud))
+
+    if dark is None:      add("light", "f_nodata_light", 0.5)
+    elif dark >= 0.9:     add("light", "f_dark", 0.8)
+    elif dark > 0.1:      add("light", "f_twilight", 1.0)
+    else:                 add("light", "f_daylight", 0.4)
+
+    # --- pressure trend: stable or slowly falling beats a sharp rise
+    dp = pressure_trend(rows, t)
     dps = f"{dp:+}"
-    if -3 <= dp <= 1:  f.append(("f_p_stable", {"dp": dps}, 1.5))
-    elif dp < -3:      f.append(("f_p_fall", {"dp": dps}, 0.8))
-    else:              f.append(("f_p_rise", {"dp": dps}, 0.3))
-    if dark >= 0.5:    f.append(("f_dark", {}, 1.0))
+    if "pressure_msl" in missing: add("pressure", "f_nodata_pressure", 0.5)
+    elif -3 <= dp <= 1:           add("pressure", "f_p_stable", 1.0, dp=dps)
+    elif dp < -3:                 add("pressure", "f_p_fall", 0.6, dp=dps)
+    else:                         add("pressure", "f_p_rise", 0.3, dp=dps)
 
     total = max(0.0, min(10.0, sum(p for _, _, p in f)))
-    unsafe = wave >= 2.5 or gust >= 60
-    return {"score": round(total, 1), "factors": f, "wave": wave, "wind": wind,
-            "gust": gust, "dp": dp, "unsafe": unsafe,
-            "start": t - timedelta(hours=2), "end": t + timedelta(hours=1)}
+    unsafe = (wave or 0) >= 2.5 or gust >= 60
+    return {"score": half(total), "factors": f, "wave": wave, "wind": wind, "wdir": wdir,
+            "gust": gust, "dp": dp, "cloud": cloud, "dark": dark, "unsafe": unsafe,
+            "missing": missing, "start": t - timedelta(hours=2), "end": t + timedelta(hours=1)}
 
 
-def day_windows(rows, extremes, day):
+def day_windows(rows, extremes, day, spot=None):
     """Score every high-water window of the day and tag it as daylight or not."""
     trange = tidal_range(extremes, day)
     out = []
     for e in extremes:
         if e["kind"] == "HW" and e["time"].date() == day:
-            c = score_window(rows, e, trange)
+            c = score_window(rows, e, trange, spot)
             if c:
-                win = [r for r in rows if c["start"] <= r["time"] <= c["end"]]
                 c["hw"], c["range"] = e, trange
-                c["daylight"] = sum(1 for r in win if r["is_day"] != 0) / len(win) >= 0.5
+                c["daylight"] = c["dark"] is None or c["dark"] < 0.5
                 out.append(c)
     return out
 
 
-def split_windows(rows, extremes, day):
+def split_windows(rows, extremes, day, spot=None):
     """(daytime, night): the best daylight window and the best night window.
     Most people fish in daylight, so daytime is the main recommendation;
     the night window is shown as an alternative."""
-    ws = day_windows(rows, extremes, day)
+    ws = day_windows(rows, extremes, day, spot)
     best = lambda xs: max(xs, key=lambda c: c["score"]) if xs else None
     return best([w for w in ws if w["daylight"]]), best([w for w in ws if not w["daylight"]])
 
 
-def best_window(rows, extremes, day):
+def best_window(rows, extremes, day, spot=None):
     """Main recommendation: the daylight window, or the night one if there is none."""
-    d, n = split_windows(rows, extremes, day)
+    d, n = split_windows(rows, extremes, day, spot)
     return d or n
+
+
+# ---------- gear tips ----------
+
+def gear_tips(win, rows, species, night=None):
+    """Rule-of-thumb tackle tips from waves, tide and light. Returns
+    (target, text key, params); target is "all" or a species key."""
+    tips = []
+    wave, rng = win["wave"], win.get("range")
+    if wave is not None:
+        w = f"{wave:.1f}"
+        if wave >= 1.3 or (rng or 0) > 4.3:
+            tips.append(("all", "t_lead_heavy", {"wave": w}))
+        elif wave < 0.5 and (rng or 4) <= 3.8:
+            tips.append(("all", "t_lead_light", {"wave": w}))
+        else:
+            tips.append(("all", "t_lead_mid", {"wave": w}))
+    # Water clarity is not measured; estimate it from the waves of the last 24 hours.
+    prev = [r["wave_height"] for r in rows
+            if win["start"] - timedelta(hours=24) <= r["time"] <= win["start"]
+            and r.get("wave_height") is not None]
+    clarity = None
+    if prev:
+        clarity = "clear" if max(prev) < 0.6 else "murky" if max(prev) > 1.0 else None
+    if "zeebaars" in species:
+        if wave is not None:
+            if wave < 0.4:   tips.append(("zeebaars", "t_bass_calm", {}))
+            elif wave < 1.4: tips.append(("zeebaars", "t_bass_surf", {}))
+            else:            tips.append(("zeebaars", "t_bass_rough", {}))
+        if clarity:
+            tips.append(("zeebaars", "t_clear" if clarity == "clear" else "t_murky", {}))
+    if "tong" in species:
+        if wave is not None:
+            tips.append(("tong", "t_sole_good" if wave < 0.8 else "t_sole_poor", {}))
+        if win.get("daylight") and night:
+            tips.append(("tong", "t_sole_night", {"s": night["start"].strftime("%H:%M"),
+                                                 "e": night["end"].strftime("%H:%M")}))
+    return tips
 
 
 # ---------- species & rules ----------
