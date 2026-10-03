@@ -50,7 +50,10 @@ def _at(rows, t):
 
 
 def pressure_trend(rows, t, hours=6):
-    now, before = _at(rows, t), _at(rows, t - timedelta(hours=hours))
+    ok = [r for r in rows if r.get("pressure_msl") is not None]
+    if not ok:
+        return 0.0
+    now, before = _at(ok, t), _at(ok, t - timedelta(hours=hours))
     return round(now["pressure_msl"] - before["pressure_msl"], 1)
 
 
@@ -61,10 +64,10 @@ def score_window(rows, hw, trange):
     if not window:
         return None
     wave = max(r["wave_height"] or 0 for r in window)
-    wind = max(r["wind_speed_10m"] for r in window)
-    gust = max(r["wind_gusts_10m"] for r in window)
+    wind = max(r["wind_speed_10m"] or 0 for r in window)
+    gust = max(r["wind_gusts_10m"] or 0 for r in window)
     dp = pressure_trend(rows, t)
-    dark = sum(1 for r in window if not r["is_day"]) / len(window)
+    dark = sum(1 for r in window if r["is_day"] == 0) / len(window)
 
     f = []  # (text key, params, points): rendered in the reader's language later
     if wave < 0.3:   f.append(("f_flat", {}, 0.5))
@@ -103,7 +106,7 @@ def day_windows(rows, extremes, day):
             if c:
                 win = [r for r in rows if c["start"] <= r["time"] <= c["end"]]
                 c["hw"], c["range"] = e, trange
-                c["daylight"] = sum(r["is_day"] for r in win) / len(win) >= 0.5
+                c["daylight"] = sum(1 for r in win if r["is_day"] != 0) / len(win) >= 0.5
                 out.append(c)
     return out
 

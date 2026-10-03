@@ -5,6 +5,7 @@ Use demo=True to generate realistic synthetic data for offline testing.
 """
 import json
 import math
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
@@ -17,10 +18,19 @@ WEATHER_VARS = "temperature_2m,pressure_msl,wind_speed_10m,wind_direction_10m,wi
 MARINE_VARS = "wave_height,wave_period,sea_level_height_msl,sea_surface_temperature,ocean_current_velocity"
 
 
-def _get(url, params):
+def _get(url, params, tries=4):
+    """GET with retries: the free API sometimes times out or rate-limits."""
     q = urllib.parse.urlencode(params)
-    with urllib.request.urlopen(f"{url}?{q}", timeout=30) as r:
-        return json.load(r)
+    last = None
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(f"{url}?{q}", timeout=30) as r:
+                return json.load(r)
+        except Exception as e:
+            last = e
+            print(f"fetch attempt {i + 1}/{tries} failed: {e}", flush=True)
+            time.sleep(5 * (i + 1))
+    raise last
 
 
 def fetch_spot(spot, days=5):

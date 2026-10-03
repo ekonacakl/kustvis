@@ -38,7 +38,11 @@ def build(demo=False, today=None):
     target = today + timedelta(days=1)
     results = []
     for spot in spots_cfg["spots"]:
-        rows = F.demo_spot(spot) if demo else F.fetch_spot(spot)
+        try:
+            rows = F.demo_spot(spot) if demo else F.fetch_spot(spot)
+        except Exception as e:  # one spot failing must not stop the bulletin
+            print(f"SKIP {spot['id']}: no data ({e})", flush=True)
+            continue
         ext = A.tide_extremes(rows)
         best = A.best_window(rows, ext, target)
         day_w, night_w = A.split_windows(rows, ext, target)
@@ -52,6 +56,8 @@ def build(demo=False, today=None):
             res["departures"] = A.departures(spots_cfg["origins"], spot, arrive, BAIT_STOP_MIN)
             res["shops"] = A.shops_open(shops, arrive - timedelta(minutes=45))
         results.append(res)
+    if not results:
+        raise SystemExit("No data for any spot: Open-Meteo unreachable. Nothing sent.")
     results.sort(key=lambda r: r["best"]["score"] if r["best"] else -1, reverse=True)
     return {"generated": datetime.now(LOCAL).replace(tzinfo=None), "today": today, "target": target, "results": results,
             "rules": rules, "demo": demo}
