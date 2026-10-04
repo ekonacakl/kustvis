@@ -1,5 +1,5 @@
 {
-  "_note": "Recreational sea fishing rules, Belgian coast, 2026. Source: recreatievezeevisserij.be and Departement Landbouw en Zeevisserij. Re-check every January; EU rules change yearly. Texts shown to users are translated in src/i18n.py.",
+  "_note": "Recreational sea fishing rules, Belgian coast, 2026. Source: recreatievezeevisserij.be and Departement Landbouw en Zeevisserij. Re-check every January; EU rules change yearly. Texts shown to users are translated in src/i18n.py. The sea bass figures are EU rules for the North Sea and are used for both regions.",
   "year": 2026,
   "sources": [
     {

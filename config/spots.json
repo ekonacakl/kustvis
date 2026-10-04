@@ -1,5 +1,5 @@
 {
-  "_note": "Coordinates are approximate. 'name' and 'tips' are per language (nl, en, fr, tr). Species use the Dutch key; translations live in src/i18n.py.",
+  "_note": "Coordinates are approximate. Each spot belongs to a region (be = Belgian coast, nld = Dutch coast near The Hague). 'mouth': true marks river mouths and outflows, where the window follows the ebb. 'tide_scale' is the neap-to-spring tidal range used to score the tide in that region.",
   "spots": [
     {
       "id": "nieuwpoort",
@@ -29,7 +29,9 @@
         "en": "Fish over high water and don't cast too far: fish feed between the rocks. Running lead, ragworm or crab.",
         "fr": "Pêchez autour de la pleine mer sans lancer trop loin : le poisson chasse entre les pierres. Plomb coulissant, néréis ou crabe.",
         "tr": "Yüksek su civarında avlanın, çok uzağa atmayın: balık taşların arasında. Kayar kurşun, kum kurdu veya yengeç."
-      }
+      },
+      "region": "be",
+      "mouth": true
     },
     {
       "id": "raversijde",
@@ -58,7 +60,8 @@
         "en": "The groynes give structure. The rising tide is often the best moment.",
         "fr": "Les brise-lames créent de la structure. La marée montante est souvent le meilleur moment.",
         "tr": "Dalgakıranlar balığı toplar. Yükselen su genelde en iyi zamandır."
-      }
+      },
+      "region": "be"
     },
     {
       "id": "oostende-west",
@@ -87,7 +90,8 @@
         "en": "Mind the sea bass protection zone in the harbour area (see rules).",
         "fr": "Attention à la zone de protection du bar dans le port (voir réglementation).",
         "tr": "Liman bölgesindeki levrek koruma alanına dikkat edin (kurallara bakın)."
-      }
+      },
+      "region": "be"
     },
     {
       "id": "oostende-oost",
@@ -116,7 +120,8 @@
         "en": "Channel on the east side. Ragworm or crab, close to the rocks.",
         "fr": "Chenal côté est. Néréis ou crabe, près des pierres.",
         "tr": "Doğu taraftaki kanal. Kum kurdu veya yengeç, taşlara yakın."
-      }
+      },
+      "region": "be"
     },
     {
       "id": "blankenberge",
@@ -146,7 +151,8 @@
         "en": "Check beforehand where fishing is allowed on the pier.",
         "fr": "Vérifiez à l'avance où la pêche est autorisée sur le pier.",
         "tr": "İskelenin neresinde balık tutmaya izin verildiğini önceden kontrol edin."
-      }
+      },
+      "region": "be"
     },
     {
       "id": "zeebrugge-west",
@@ -174,59 +180,302 @@
         "en": "Deep water and strong current: heavier tackle and a long landing net. Watch for shipping.",
         "fr": "Eau profonde et courant : matériel plus lourd et épuisette à long manche. Attention aux navires.",
         "tr": "Derin su ve akıntı: daha ağır takım ve uzun kepçe. Gemi trafiğine dikkat."
+      },
+      "region": "be"
+    },
+    {
+      "id": "hoek-van-holland",
+      "region": "nld",
+      "mouth": true,
+      "lat": 51.984,
+      "lon": 4.1,
+      "type": "harbour_wall",
+      "name": {
+        "nl": "Hoek van Holland – Noorderpier & Nieuwe Waterweg",
+        "en": "Hoek van Holland – north pier & Nieuwe Waterweg",
+        "fr": "Hoek van Holland – jetée nord & Nieuwe Waterweg",
+        "tr": "Hoek van Holland – kuzey mendireği ve Nieuwe Waterweg ağzı"
+      },
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong",
+          "makreel"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Riviermonding met veel scheepvaart en sterke stroming. Vis op de stroomnaad waar zoet en zout water mengen.",
+        "en": "River mouth with heavy shipping and strong current. Fish the seam where fresh and salt water mix.",
+        "fr": "Embouchure avec beaucoup de navires et un fort courant. Pêchez la veine où l'eau douce et l'eau salée se mélangent.",
+        "tr": "Yoğun gemi trafiği ve güçlü akıntısı olan nehir ağzı. Tatlı ve tuzlu suyun karıştığı akıntı çizgisine atın."
+      }
+    },
+    {
+      "id": "kijkduin",
+      "region": "nld",
+      "lat": 52.069,
+      "lon": 4.218,
+      "type": "beach",
+      "name": {
+        "nl": "Kijkduin – strand",
+        "en": "Kijkduin – beach",
+        "fr": "Kijkduin – plage",
+        "tr": "Kijkduin – plaj"
+      },
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Rustiger dan Scheveningen. Zoek bij laag water de geulen tussen de zandbanken.",
+        "en": "Quieter than Scheveningen. At low water, look for the gullies between the sandbanks.",
+        "fr": "Plus calme que Scheveningen. À marée basse, repérez les chenaux entre les bancs de sable.",
+        "tr": "Scheveningen'den daha sakin. Alçak suda kum bankları arasındaki kanalları bulun."
+      }
+    },
+    {
+      "id": "scheveningen",
+      "region": "nld",
+      "lat": 52.104,
+      "lon": 4.257,
+      "type": "pier",
+      "name": {
+        "nl": "Scheveningen – havenhoofden",
+        "en": "Scheveningen – harbour piers",
+        "fr": "Scheveningen – jetées du port",
+        "tr": "Scheveningen – liman mendirekleri"
+      },
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong",
+          "makreel"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Vis langs de stenen van de havenhoofden. Controleer welke delen toegankelijk zijn en let op scheepvaart.",
+        "en": "Fish along the rocks of the harbour piers. Check which parts are open and watch for shipping.",
+        "fr": "Pêchez le long des enrochements des jetées. Vérifiez les parties accessibles et attention aux navires.",
+        "tr": "Mendireklerin taşları boyunca avlanın. Hangi bölümlerin açık olduğunu kontrol edin, gemilere dikkat."
+      }
+    },
+    {
+      "id": "katwijk",
+      "region": "nld",
+      "mouth": true,
+      "lat": 52.212,
+      "lon": 4.397,
+      "type": "beach",
+      "name": {
+        "nl": "Katwijk – uitwatering Oude Rijn",
+        "en": "Katwijk – Oude Rijn outflow",
+        "fr": "Katwijk – exutoire du Vieux Rhin",
+        "tr": "Katwijk – Oude Rijn çıkışı"
+      },
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Zoetwateruitstroom via de spuisluis. Als er gespuid wordt, trekt de stroming aasvis en zeebaars aan.",
+        "en": "Freshwater outflow through the sluice. When it discharges, the current draws baitfish and bass.",
+        "fr": "Sortie d'eau douce par l'écluse. Quand elle évacue, le courant attire le fretin et le bar.",
+        "tr": "Savaktan tatlı su çıkışı. Savak su bırakırken akıntı yem balığını ve levreği çeker."
+      }
+    },
+    {
+      "id": "noordwijk",
+      "region": "nld",
+      "lat": 52.245,
+      "lon": 4.428,
+      "type": "beach",
+      "name": {
+        "nl": "Noordwijk – strand",
+        "en": "Noordwijk – beach",
+        "fr": "Noordwijk – plage",
+        "tr": "Noordwijk – plaj"
+      },
+      "species": {
+        "summer": [
+          "zeebaars",
+          "tong"
+        ],
+        "winter": [
+          "wijting",
+          "gul",
+          "schar"
+        ]
+      },
+      "tips": {
+        "nl": "Open zandstrand. Vis in de eerste geul; bij rustig weer loont ver werpen.",
+        "en": "Open sandy beach. Fish the first gully; in calm weather a long cast pays off.",
+        "fr": "Plage de sable ouverte. Pêchez le premier chenal ; par temps calme, lancez loin.",
+        "tr": "Açık kum plajı. İlk kanala atın; sakin havada uzun atış işe yarar."
       }
     }
   ],
-  "origins": [
+  "regions": [
     {
+      "id": "be",
+      "path": "",
       "name": {
-        "nl": "Brussel",
-        "en": "Brussels",
-        "fr": "Bruxelles",
-        "tr": "Brüksel"
+        "nl": "België",
+        "en": "Belgium",
+        "fr": "Belgique",
+        "tr": "Belçika"
       },
-      "lat": 50.846,
-      "lon": 4.352
+      "sea_bearing": 320,
+      "tide_scale": [
+        2.8,
+        4.6
+      ],
+      "rules_url": "https://www.recreatievezeevisserij.be",
+      "rules_site": "recreatievezeevisserij.be",
+      "origins": [
+        {
+          "name": {
+            "nl": "Brussel",
+            "en": "Brussels",
+            "fr": "Bruxelles",
+            "tr": "Brüksel"
+          },
+          "lat": 50.846,
+          "lon": 4.352
+        },
+        {
+          "name": {
+            "nl": "Leuven",
+            "en": "Leuven",
+            "fr": "Louvain",
+            "tr": "Leuven"
+          },
+          "lat": 50.879,
+          "lon": 4.701
+        },
+        {
+          "name": {
+            "nl": "Antwerpen",
+            "en": "Antwerp",
+            "fr": "Anvers",
+            "tr": "Anvers"
+          },
+          "lat": 51.219,
+          "lon": 4.402
+        },
+        {
+          "name": {
+            "nl": "Gent",
+            "en": "Ghent",
+            "fr": "Gand",
+            "tr": "Gent"
+          },
+          "lat": 51.054,
+          "lon": 3.717
+        },
+        {
+          "name": {
+            "nl": "Brugge",
+            "en": "Bruges",
+            "fr": "Bruges",
+            "tr": "Brugge"
+          },
+          "lat": 51.209,
+          "lon": 3.225
+        }
+      ]
     },
     {
+      "id": "nld",
+      "path": "nederland/",
       "name": {
-        "nl": "Leuven",
-        "en": "Leuven",
-        "fr": "Louvain",
-        "tr": "Leuven"
+        "nl": "Nederland",
+        "en": "Netherlands",
+        "fr": "Pays-Bas",
+        "tr": "Hollanda"
       },
-      "lat": 50.879,
-      "lon": 4.701
-    },
-    {
-      "name": {
-        "nl": "Antwerpen",
-        "en": "Antwerp",
-        "fr": "Anvers",
-        "tr": "Anvers"
-      },
-      "lat": 51.219,
-      "lon": 4.402
-    },
-    {
-      "name": {
-        "nl": "Gent",
-        "en": "Ghent",
-        "fr": "Gand",
-        "tr": "Gent"
-      },
-      "lat": 51.054,
-      "lon": 3.717
-    },
-    {
-      "name": {
-        "nl": "Brugge",
-        "en": "Bruges",
-        "fr": "Bruges",
-        "tr": "Brugge"
-      },
-      "lat": 51.209,
-      "lon": 3.225
+      "sea_bearing": 300,
+      "tide_scale": [
+        1.3,
+        2.3
+      ],
+      "rules_url": "https://www.sportvisserijnederland.nl",
+      "rules_site": "sportvisserijnederland.nl",
+      "origins": [
+        {
+          "name": {
+            "nl": "Den Haag",
+            "en": "The Hague",
+            "fr": "La Haye",
+            "tr": "Lahey"
+          },
+          "lat": 52.078,
+          "lon": 4.3
+        },
+        {
+          "name": {
+            "nl": "Rotterdam",
+            "en": "Rotterdam",
+            "fr": "Rotterdam",
+            "tr": "Rotterdam"
+          },
+          "lat": 51.922,
+          "lon": 4.48
+        },
+        {
+          "name": {
+            "nl": "Leiden",
+            "en": "Leiden",
+            "fr": "Leyde",
+            "tr": "Leiden"
+          },
+          "lat": 52.16,
+          "lon": 4.49
+        },
+        {
+          "name": {
+            "nl": "Amsterdam",
+            "en": "Amsterdam",
+            "fr": "Amsterdam",
+            "tr": "Amsterdam"
+          },
+          "lat": 52.37,
+          "lon": 4.9
+        },
+        {
+          "name": {
+            "nl": "Utrecht",
+            "en": "Utrecht",
+            "fr": "Utrecht",
+            "tr": "Utrecht"
+          },
+          "lat": 52.09,
+          "lon": 5.12
+        }
+      ]
     }
   ]
 }
