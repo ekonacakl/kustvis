@@ -68,7 +68,7 @@ def demo_spot(spot, days=5, start=None):
         t = start + timedelta(hours=h)
         hrs = h + phase
         spring = 1.9 + 0.35 * math.cos(2 * math.pi * hrs / (14.77 * 24))
-        sea = spring * math.cos(2 * math.pi * hrs / 12.42)
+        sea = spring * math.cos(2 * math.pi * hrs / 12.42) * (0.45 if spot.get("region") == "nld" else 1)
         pressure = 1014 - 9 * math.exp(-((h - 50) / 14) ** 2) + 2 * math.sin(h / 30)
         wind = 14 + 10 * math.exp(-((h - 52) / 10) ** 2) + 4 * math.sin(h / 5)
         rows.append({

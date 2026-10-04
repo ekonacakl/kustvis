@@ -13,7 +13,21 @@ def A(v):
 from i18n import LANGS, LANG_NAMES, T, sp, text
 
 BAIT_MIN = 20
-RULES_URL = "https://www.recreatievezeevisserij.be"
+
+
+def rkey(rep, key, L):
+    """Region-specific text if it exists (e.g. general_nld), else the default."""
+    x = T[L]
+    return x.get(f"{key}_{rep['region']['id']}", x[key])
+
+
+def root_prefix(rep, L):
+    depth = (1 if rep["region"]["path"] else 0) + (0 if L == "nl" else 1)
+    return "../" * depth or "./"
+
+
+def href(root, region, L):
+    return (root + region["path"] + ("" if L == "nl" else f"{L}/")) or "./"
 
 
 def hm(t):
@@ -103,13 +117,39 @@ def missing_lines(rep, L):
     return out
 
 
+def pick_lines(rep, L):
+    """'Best for ...' lines, shared by the bulletin and the page."""
+    x, out = T[L], []
+    for kind, spc, r, v in rep.get("picks", []):
+        spot = short_name(r["spot"], L) if kind != "species" else text(r["spot"]["name"], L)
+        if kind == "species":
+            out.append(("🎯", x["p_species"].format(sp=sp(spc, L).capitalize(), spot=spot, v=sc(v))))
+        elif kind == "variety":
+            out.append(("🐟", x["p_variety"].format(spot=text(r["spot"]["name"], L), v=v, list=species_list(r, L))))
+        elif kind == "shelter":
+            out.append(("🛡", x["p_shelter"].format(spot=text(r["spot"]["name"], L), v=v)))
+        elif kind == "night":
+            n = r["night"]
+            out.append(("🌙", x["p_night"].format(spot=text(r["spot"]["name"], L), s=hm(n["start"]), e=hm(n["end"]), v=sc(v))))
+    return out
+
+
+def fit_list(r, L):
+    return " · ".join(f"{sp(k, L)} {sc(v)}" for k, v in sorted(r.get("fit", {}).items(), key=lambda kv: -kv[1]))
+
+
 # ---------------- Telegram ----------------
 
 def telegram(rep, L="nl", site_url=""):
     x, t = T[L], rep["target"]
-    lines = [x["tg_title"].format(date=dag(t, L))]
+    lines = [x["tg_title"].format(date=dag(t, L), region=text(rep["region"]["name"], L))]
     if rep["demo"]:
         lines.append(f"<i>({x['test_data']})</i>")
+    pl = pick_lines(rep, L)
+    if pl:
+        lines.append("")
+        lines.append(f"<b>{x['picks']}</b>")
+        lines.extend(f"{icon} {E(t_)}" for icon, t_ in pl)
     for i, r in enumerate([r for r in rep["results"] if r["best"]][:3]):
         b, s = r["best"], r["spot"]
         lines.append("")
@@ -122,7 +162,9 @@ def telegram(rep, L="nl", site_url=""):
         if n:
             lines.append(x["tg_night"].format(hw=hm(n["hw"]["time"]), s=hm(n["start"]), e=hm(n["end"]),
                                               part=part(n["start"], L), sc=sc(n["score"])))
-        if r["species"]:
+        if r.get("fit"):
+            lines.append(f"🐟 {fit_list(r, L)}")
+        elif r["species"]:
             lines.append(f"🐟 {species_list(r, L)}")
         if i == 0:
             for tp in r.get("tips", []):
@@ -152,7 +194,7 @@ def telegram(rep, L="nl", site_url=""):
     lines.extend(closed)
     lines.append(x["tg_recfishing"])
     if site_url:
-        url = site_url.rstrip("/") + ("/" if L == "nl" else f"/{L}/")
+        url = href(site_url.rstrip("/") + "/", rep["region"], L)
         lines.append(f'<a href="{url}">{x["tg_link"]}</a>')
     lines.append(f"<i>{x['tg_disclaimer']}</i>")
     for m in missing_lines(rep, L):
@@ -203,31 +245,40 @@ def score_bar(score, unsafe):
     return f'<span class="score {cls}"><b>{score:g}</b><span>/10</span></span>'
 
 
-def lang_switch(L, prefix):
+def lang_switch(rep, L, root):
     items = []
     for code in LANGS:
-        href = prefix + ("" if code == "nl" else f"{code}/")
         cur = ' aria-current="page"' if code == L else ""
-        items.append(f'<a href="{href or "./"}" lang="{code}" hreflang="{code}"{cur} title="{LANG_NAMES[code]}">{code.upper()}</a>')
+        items.append(f'<a href="{href(root, rep["region"], code)}" lang="{code}" hreflang="{code}"{cur} title="{LANG_NAMES[code]}">{code.upper()}</a>')
     return f'<nav class="langs" aria-label="Language">{"".join(items)}</nav>'
+
+
+def region_switch(rep, L, root):
+    items = []
+    for r in rep["regions"]:
+        cur = ' aria-current="page"' if r["id"] == rep["region"]["id"] else ""
+        items.append(f'<a href="{href(root, r, L)}"{cur}>{E(text(r["name"], L))}</a>')
+    return f'<nav class="regions" aria-label="{A(T[L]["region_label"])}">{"".join(items)}</nav>'
 
 
 def page(rep, L="nl"):
     x, t = T[L], rep["target"]
-    prefix = "./" if L == "nl" else "../"
+    prefix = root_prefix(rep, L)
+    region = rep["region"]
     res = [r for r in rep["results"] if r["best"]]
     top = res[0] if res else None
     gen = rep["generated"]
     upd = x["updated"].format(date=dag(gen.date(), L), time=hm(gen)) + (f" · {x['test_data']}" if rep["demo"] else "")
-    title = f"Kustvis – {dag(t, L)}"
+    title = f"Kustvis {text(region['name'], L)} – {dag(t, L)}"
     out = [f"""<!doctype html><html lang="{L}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{E(title)}</title>
-{''.join(f'<link rel="alternate" hreflang="{c}" href="{prefix}{"" if c == "nl" else c + "/"}">' for c in LANGS)}
+{''.join(f'<link rel="alternate" hreflang="{c}" href="{href(prefix, region, c)}">' for c in LANGS)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>{CSS}</style></head><body><main>
-<header class="top"><span class="brand">Kustvis</span>{lang_switch(L, prefix)}</header>
+<header class="top"><span class="brand">Kustvis</span>{lang_switch(rep, L, prefix)}</header>
+{region_switch(rep, L, prefix)}
 <p class="upd">{E(upd)}</p>"""]
     if top:
         b, s = top["best"], top["spot"]
@@ -250,6 +301,11 @@ def page(rep, L="nl"):
     targets = [k for k in ("zeebaars", "tong") if any(k in r["species"] for r in res)]
     chips = "".join(f'<button type="button" data-t="{k}" aria-pressed="{"true" if k == "all" else "false"}">{E(lab)}</button>'
                     for k, lab in [("all", x["all"])] + [(k, sp(k, L).capitalize()) for k in targets])
+    pl = pick_lines(rep, L)
+    if pl:
+        out.append(f'<section class="picks"><h2>{E(x["picks"])}</h2><ul>'
+                   + "".join(f"<li><span aria-hidden=\"true\">{icon}</span> {E(t_)}</li>" for icon, t_ in pl)
+                   + f'</ul><p class="note">{E(x["fit_note"])}</p></section>')
     out.append(f'<section><h2>{E(x["all_spots"])}</h2>'
                + (f'<div class="target" role="group" aria-label="{A(x["target"])}"><span>{E(x["target"])}</span>{chips}</div>' if targets else "")
                + '<ol class="spots">')
@@ -263,11 +319,14 @@ def page(rep, L="nl"):
         tips = "".join(f'<li data-sp="{tp[0]}">{"" if tp[0] == "all" else "<b>" + E(sp(tp[0], L).capitalize()) + ":</b> "}{E(tip(tp, L))}</li>'
                        for tp in r.get("tips", []))
         meta = x["meta"].format(hw=hm(b["hw"]["time"]), s=hm(b["start"]), e=hm(b["end"]), r=b["range"] or "?")
-        out.append(f"""<li class="spot"><div class="head"><h3>{E(text(s['name'], L))}</h3>{score_bar(b['score'], b['unsafe'])}</div>
+        fits = " ".join(f'data-fit-{k}="{v}"' for k, v in r.get("fit", {}).items())
+        fitchips = "".join(f'<span class="fit" data-sp="{k}">{E(sp(k, L))} <b>{sc(v)}</b></span>'
+                           for k, v in sorted(r.get("fit", {}).items(), key=lambda kv: -kv[1]))
+        out.append(f"""<li class="spot" {fits}><div class="head"><h3>{E(text(s['name'], L))}</h3>{score_bar(b['score'], b['unsafe'])}</div>
 <p class="meta">{E(meta)}</p>
 {f'<p class="meta">🌙 {E(x["night_meta"].format(hw=hm(r["night"]["hw"]["time"]), s=hm(r["night"]["start"]), e=hm(r["night"]["end"]), sc=sc(r["night"]["score"])))}</p>' if r.get("night") else ''}
 {tide_svg(r, t, L, h=70)}
-<p><b>{x['fish']}:</b> {E(species_list(r, L) or x['no_fish'])}</p>
+<p class="fits"><b>{x['fit'] if fitchips else x['fish']}:</b> {fitchips or E(species_list(r, L) or x['no_fish'])}</p>
 <p class="tip">{E(text(s['tips'], L))}</p>
 {f'<div class="gear"><h4>{E(x["gear"])}</h4><ul>{tips}</ul></div>' if tips else ''}
 <p><a class="btn" href="{maps_url(s)}" target="_blank" rel="noopener">{E(x['route'])}</a></p>
@@ -278,15 +337,15 @@ def page(rep, L="nl"):
 
     rules = rep["rules"]
     zb = rules["species"]["zeebaars"]
-    gen_rules = "".join(f"<li>{E(g)}</li>" for g in x["general"])
+    gen_rules = "".join(f"<li>{E(g)}</li>" for g in rkey(rep, "general", L))
     months = "".join(f'<span class="{"x" if i + 1 in zb["no_retention_months"] else ""}">{m}</span>'
                      for i, m in enumerate(x["months"]))
-    link = f'<a href="{RULES_URL}">recreatievezeevisserij.be</a>'
+    link = f'<a href="{region["rules_url"]}">{region["rules_site"]}</a>'
     out.append(f"""<section class="rules"><h2>{E(x['rules_title'].format(y=rules['year']))}</h2>
 <div class="rule-bass"><h3>{E(sp('zeebaars', L).capitalize())}</h3>
 <p>{x['bass_line'].format(min=zb['min_size_cm'], bag=zb['bag_limit_per_day'])}</p>
 <div class="months">{months}</div>
-<p class="note">{E(x['months_note'])} {E(x['bass_extra'])}</p></div>
+<p class="note">{E(x['months_note'])} {E(rkey(rep, 'bass_extra', L))}</p></div>
 <ul>{gen_rules}</ul>
 <p class="note">{x['source'].format(link=link)}</p></section>
 <footer><p>{E(x['footer'])}</p><p>{E(x['gear_note'])}</p>{"".join(f"<p>ⓘ {E(m)}</p>" for m in missing_lines(rep, L))}</footer>
@@ -296,8 +355,13 @@ def page(rep, L="nl"):
 
 JS = """
 (function(){var b=document.querySelectorAll('.target button');if(!b.length)return;
+var ol=document.querySelector('.spots'),li=[].slice.call(ol.children);
+li.forEach(function(e,i){e.setAttribute('data-i',i)});
 function set(t){document.body.setAttribute('data-target',t);
 for(var i=0;i<b.length;i++)b[i].setAttribute('aria-pressed',b[i].getAttribute('data-t')===t?'true':'false');
+li.slice().sort(function(p,q){if(t==='all')return p.getAttribute('data-i')-q.getAttribute('data-i');
+var d=(parseFloat(q.getAttribute('data-fit-'+t))||-1)-(parseFloat(p.getAttribute('data-fit-'+t))||-1);
+return d||p.getAttribute('data-i')-q.getAttribute('data-i')}).forEach(function(e){ol.appendChild(e)});
 try{localStorage.setItem('kustvis-target',t)}catch(e){}}
 for(var i=0;i<b.length;i++)b[i].addEventListener('click',function(){set(this.getAttribute('data-t'))});
 var s='all';try{s=localStorage.getItem('kustvis-target')||'all'}catch(e){}
@@ -376,4 +440,14 @@ a:focus-visible,summary:focus-visible{outline:3px solid var(--buoy);outline-offs
 .gear ul{margin:0;padding-left:18px;font-size:15px}
 body[data-target=zeebaars] .gear li[data-sp=tong],body[data-target=tong] .gear li[data-sp=zeebaars]{display:none}
 .btn{display:inline-block;font-weight:600;font-size:15px;text-decoration:none;background:var(--sea);color:var(--foam);padding:8px 14px;border-radius:4px}
+.regions{display:flex;gap:4px;margin:10px 0 0}
+.regions a{font:600 15px Barlow,sans-serif;text-decoration:none;color:var(--sea);padding:5px 12px;border:2px solid var(--sea);border-radius:4px}
+.regions a[aria-current]{background:var(--sea);color:var(--foam)}
+.regions a:focus-visible{outline:3px solid var(--buoy);outline-offset:2px}
+.picks ul{list-style:none;padding:0;margin:0 0 8px;background:var(--paper);border:1px solid var(--line)}
+.picks li{padding:9px 12px;border-bottom:1px solid var(--line);font-weight:500}
+.picks li:last-child{border-bottom:0}
+.fits{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fit{background:var(--foam);border:1px solid var(--line);border-radius:3px;padding:1px 8px;font-size:15px}
+body[data-target=zeebaars] .fit[data-sp=zeebaars],body[data-target=tong] .fit[data-sp=tong]{border-color:var(--sea);background:var(--buoy);color:#172a31}
 """

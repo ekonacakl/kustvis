@@ -32,12 +32,17 @@ def load(name):
     return json.loads((ROOT / "config" / name).read_text(encoding="utf-8"))
 
 
-def build(demo=False, today=None):
-    spots_cfg, rules, shops = load("spots.json"), load("rules.json"), load("bait_shops.json")["shops"]
+def build(region, cfg, demo=False, today=None):
+    """Build the report for one region (be = Belgian coast, nld = Dutch coast)."""
+    rules, shops = load("rules.json"), load("bait_shops.json")["shops"]
+    shops = [s for s in shops if s.get("region", "be") == region["id"]]
     today = today or datetime.now(LOCAL).date()
     target = today + timedelta(days=1)
     results, skipped = [], []
-    for spot in spots_cfg["spots"]:
+    for spot in cfg["spots"]:
+        if spot.get("region", "be") != region["id"]:
+            continue
+        spot = {"sea_bearing": region["sea_bearing"], "tide_scale": region["tide_scale"], **spot}
         try:
             rows = F.demo_spot(spot) if demo else F.fetch_spot(spot)
         except Exception as e:  # one spot failing must not stop the bulletin
@@ -50,26 +55,35 @@ def build(demo=False, today=None):
         species = A.species_for(spot, target)
         outlook = [(target + timedelta(days=i), A.best_window(rows, ext, target + timedelta(days=i), spot))
                    for i in range(4)]
-        res = {"spot": spot, "rows": rows, "extremes": ext, "best": best, "night": night_w if night_w is not best else None, "outlook": outlook,
+        res = {"spot": spot, "rows": rows, "extremes": ext, "best": best,
+               "night": night_w if night_w is not best else None, "outlook": outlook,
                "species": species, "legal": A.legal_notes(species, rules, target)}
         if best:
-            res["tips"] = A.gear_tips(best, rows, species, res["night"])
+            res["fit"] = A.species_fit(best, spot, species)
+            res["tips"] = A.gear_tips(best, rows, species, res["night"], spot)
             arrive = best["start"] - timedelta(minutes=ARRIVE_BEFORE_WINDOW)
-            res["departures"] = A.departures(spots_cfg["origins"], spot, arrive, BAIT_STOP_MIN)
+            res["departures"] = A.departures(region["origins"], spot, arrive, BAIT_STOP_MIN)
             res["shops"] = A.shops_open(shops, arrive - timedelta(minutes=45))
         results.append(res)
     if not results:
-        raise SystemExit("No data for any spot: Open-Meteo unreachable. Nothing sent.")
-    results.sort(key=lambda r: r["best"]["score"] if r["best"] else -1, reverse=True)
-    return {"generated": datetime.now(LOCAL).replace(tzinfo=None), "today": today, "target": target, "results": results,
-            "rules": rules, "demo": demo, "skipped": skipped}
+        raise RuntimeError(f"no data for any spot in region {region['id']}")
+    # Ties in the general score are broken by the best species fit at the spot.
+    results.sort(key=lambda r: (r["best"]["score"], max(r.get("fit", {}).values(), default=0)) if r["best"] else (-1, 0),
+                 reverse=True)
+    return {"generated": datetime.now(LOCAL).replace(tzinfo=None), "today": today, "target": target,
+            "results": results, "rules": rules, "demo": demo, "skipped": skipped,
+            "region": region, "regions": cfg["regions"], "picks": A.picks(results)}
 
 
-def chat_ids():
-    """One Telegram channel per language: TELEGRAM_CHAT_ID_NL, _EN, _FR, _TR.
-    TELEGRAM_CHAT_ID (no suffix) is treated as the Dutch channel."""
-    ids = {L: os.environ.get(f"TELEGRAM_CHAT_ID_{L.upper()}") for L in LANGS}
-    ids["nl"] = ids["nl"] or os.environ.get("TELEGRAM_CHAT_ID")
+def chat_ids(region):
+    """One Telegram channel per region and language.
+    Belgium:     TELEGRAM_CHAT_ID_NL, _EN, _FR, _TR
+    Netherlands: TELEGRAM_CHAT_ID_NLD_NL, _NLD_EN, _NLD_FR, _NLD_TR
+    Channels that are not configured are skipped."""
+    mid = "" if region["id"] == "be" else region["id"].upper() + "_"
+    ids = {L: os.environ.get(f"TELEGRAM_CHAT_ID_{mid}{L.upper()}") for L in LANGS}
+    if region["id"] == "be":
+        ids["nl"] = ids["nl"] or os.environ.get("TELEGRAM_CHAT_ID")
     return {L: c for L, c in ids.items() if c}
 
 
@@ -83,25 +97,36 @@ def send_telegram(chat, text):
 
 def main():
     demo = "--demo" in sys.argv
-    report = build(demo=demo)
+    send = "--no-send" not in sys.argv and not demo
+    cfg = load("spots.json")
     site_url = os.environ.get("SITE_URL", "")
     out = ROOT / "site"
-    for L in LANGS:
-        d = out if L == "nl" else out / L
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(R.page(report, L), encoding="utf-8")
-        (d / "bulletin.txt").write_text(R.telegram(report, L, site_url), encoding="utf-8")
-    print(R.telegram(report, "nl", site_url))
-    if "--no-send" in sys.argv or demo:
-        return
-    if not os.environ.get("TELEGRAM_BOT_TOKEN"):
-        print("TELEGRAM_BOT_TOKEN not set; skipping send.")
-        return
-    for L, chat in chat_ids().items():
+    built = 0
+    for region in cfg["regions"]:
         try:
-            print(f"Telegram {L}:", send_telegram(chat, R.telegram(report, L, site_url)))
-        except Exception as e:  # one failing channel must not stop the others
-            print(f"Telegram {L} failed: {e}")
+            report = build(region, cfg, demo=demo)
+        except Exception as e:  # one region failing must not stop the other
+            print(f"REGION {region['id']} FAILED: {e}", flush=True)
+            continue
+        built += 1
+        for L in LANGS:
+            d = out / region["path"] / ("" if L == "nl" else L)
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "index.html").write_text(R.page(report, L), encoding="utf-8")
+            (d / "bulletin.txt").write_text(R.telegram(report, L, site_url), encoding="utf-8")
+        print(R.telegram(report, "nl", site_url), "\n", flush=True)
+        if not send:
+            continue
+        if not os.environ.get("TELEGRAM_BOT_TOKEN"):
+            print("TELEGRAM_BOT_TOKEN not set; skipping send.")
+            continue
+        for L, chat in chat_ids(region).items():
+            try:
+                print(f"Telegram {region['id']}/{L}:", send_telegram(chat, R.telegram(report, L, site_url)))
+            except Exception as e:  # one failing channel must not stop the others
+                print(f"Telegram {region['id']}/{L} failed: {e}")
+    if not built:
+        raise SystemExit("No data for any region: Open-Meteo unreachable. Nothing sent.")
 
 
 if __name__ == "__main__":

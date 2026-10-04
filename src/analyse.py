@@ -16,6 +16,8 @@ BASS_SEASON = (date(2000, 4, 25), date(2000, 11, 15))  # typical inshore bass wi
 def tide_extremes(rows):
     """High and low water from the hourly sea-level curve, refined with a
     parabola through the 3 points around each turning point."""
+    levels = [r["sea_level_height_msl"] for r in rows if r.get("sea_level_height_msl") is not None]
+    mid = sum(levels) / len(levels) if levels else 0.0
     out = []
     for i in range(1, len(rows) - 1):
         a, b, c = (rows[i - 1]["sea_level_height_msl"], rows[i]["sea_level_height_msl"],
@@ -23,7 +25,9 @@ def tide_extremes(rows):
         if None in (a, b, c):
             continue
         kind = "HW" if b > a and b >= c else "LW" if b < a and b <= c else None
-        if not kind:
+        # Ignore small wiggles on the wrong side of mean level (e.g. the double
+        # low water at Hoek van Holland), which are not real high or low waters.
+        if not kind or (kind == "HW" and b < mid) or (kind == "LW" and b > mid):
             continue
         denom = a - 2 * b + c
         off = 0.5 * (a - c) / denom if denom else 0.0
@@ -79,16 +83,21 @@ def half(x):
 
 
 def score_window(rows, hw, trange, spot=None):
-    """Score the window HW-2h..HW+1h from 0 to 10 (steps of 0.5).
+    """Score the fishing window from 0 to 10 (steps of 0.5). The window is
+    HW-2h..HW+1h, or HW..HW+3h (the ebb) at river mouths and outflows.
 
     Six parts, each worth a fixed share: waves 2.5, tide 2.5, wind 2, cloud 1,
     pressure 1, light 1. Spot type matters: an open beach wants some surf, a pier
     or harbour wall is more forgiving. A missing input counts as neutral (half
     its share) and is reported in c["missing"]."""
     t = hw["time"]
-    window = [r for r in rows if t - timedelta(hours=2) <= r["time"] <= t + timedelta(hours=1)]
+    before, after = (0, 3) if (spot or {}).get("mouth") else (2, 1)
+    start, end = t - timedelta(hours=before), t + timedelta(hours=after)
+    window = [r for r in rows if start <= r["time"] <= end]
     if not window:
         return None
+    lo, hi = (spot or {}).get("tide_scale", (2.8, 4.6))
+    tide_v = None
     kind = (spot or {}).get("type", "beach")
     bearing = (spot or {}).get("sea_bearing", SEA_BEARING)
     missing = [k for k in USED_VARS if not _vals(window, k)]
@@ -118,9 +127,9 @@ def score_window(rows, hw, trange, spot=None):
     if trange is None:
         add("tide", "f_nodata_tide", 0.5)
     else:
-        v = max(0.2, min(1.0, (trange - 2.8) / (4.6 - 2.8)))
-        key = "f_spring" if trange > 4.3 else "f_mean" if trange > 3.6 else "f_neap"
-        add("tide", key, v, r=f"{trange:.1f}")
+        tide_v = (trange - lo) / (hi - lo)   # 0 = neap, 1 = spring, for this region
+        key = "f_spring" if tide_v > 0.83 else "f_mean" if tide_v > 0.44 else "f_neap"
+        add("tide", key, max(0.2, min(1.0, tide_v)), r=f"{trange:.1f}")
 
     # --- wind: speed, and direction relative to the coast
     ws = _vals(window, "wind_speed_10m")
@@ -173,7 +182,7 @@ def score_window(rows, hw, trange, spot=None):
     unsafe = (wave or 0) >= 2.5 or gust >= 60
     return {"score": half(total), "factors": f, "wave": wave, "wind": wind, "wdir": wdir,
             "gust": gust, "dp": dp, "cloud": cloud, "dark": dark, "unsafe": unsafe,
-            "missing": missing, "start": t - timedelta(hours=2), "end": t + timedelta(hours=1)}
+            "missing": missing, "tide_v": tide_v, "start": start, "end": end}
 
 
 def day_windows(rows, extremes, day, spot=None):
@@ -205,18 +214,107 @@ def best_window(rows, extremes, day, spot=None):
     return d or n
 
 
+# ---------- per-species fit ----------
+# Weather is nearly identical along a short coast, so the general score barely
+# separates the spots. What does differ is the spot itself (beach, pier, harbour
+# wall, river mouth) and what each species wants. Rules of thumb, tune freely.
+#   wave: (ideal_low, ideal_high) in metres   light: "low" | "day" | None
+#   spot: bonus per spot trait                current: how much the fish likes a strong tide
+SPECIES_PREF = {
+    "zeebaars": {"wave": (0.5, 1.4), "light": "low", "current": 1.5,
+                 "spot": {"mouth": 1.5, "beach": 0.5, "pier": 0.5, "harbour_wall": 0.5}},
+    "tong":     {"wave": (0.0, 0.6), "light": "low", "current": 0.0,
+                 "spot": {"beach": 1.0, "mouth": 0.5, "pier": 0.0, "harbour_wall": -0.5}},
+    "paling":   {"wave": (0.0, 0.7), "light": "low", "current": 0.5,
+                 "spot": {"mouth": 1.5, "pier": 0.5, "harbour_wall": 0.5, "beach": -0.5}},
+    "makreel":  {"wave": (0.0, 0.8), "light": "day", "current": 1.0,
+                 "spot": {"harbour_wall": 1.5, "pier": 1.0, "mouth": 0.0, "beach": -1.0}},
+    "wijting":  {"wave": (0.4, 1.5), "light": "low", "current": 1.0,
+                 "spot": {"pier": 0.5, "beach": 0.5, "harbour_wall": 0.5, "mouth": 0.0}},
+    "gul":      {"wave": (0.6, 1.8), "light": "low", "current": 1.5,
+                 "spot": {"harbour_wall": 1.0, "pier": 0.5, "beach": 0.5, "mouth": 0.0}},
+    "schar":    {"wave": (0.2, 1.0), "light": None, "current": 0.5,
+                 "spot": {"beach": 1.0, "pier": 0.0, "harbour_wall": 0.0, "mouth": 0.0}},
+}
+
+
+def species_fit(win, spot, species):
+    """0..10 (steps of 0.5) per species: how well this window at this spot suits it."""
+    out = {}
+    for sp in species:
+        pref = SPECIES_PREF.get(sp)
+        if not pref:
+            continue
+        v = 5.0
+        wave = win.get("wave")
+        if wave is not None:
+            lo, hi = pref["wave"]
+            if lo <= wave <= hi:  v += 2.0
+            else:                 v -= min(3.0, 2.5 * (lo - wave if wave < lo else wave - hi))
+        dark, cloud = win.get("dark"), win.get("cloud")
+        if dark is not None and pref["light"]:
+            low = dark > 0.1 or (cloud or 0) >= 70
+            if pref["light"] == "low":  v += 1.5 if dark > 0.1 else 0.5 if low else -1.0
+            else:                       v += 1.0 if dark < 0.1 else -2.0
+        if win.get("tide_v") is not None:
+            v += pref["current"] * (max(0.0, min(1.0, win["tide_v"])) - 0.4)
+        v += pref["spot"].get(spot.get("type", "beach"), 0)
+        if spot.get("mouth"):
+            v += pref["spot"].get("mouth", 0)
+        wind = win.get("wind")
+        if wind is not None and wind >= 30:
+            v -= 1.0 if spot.get("type") == "beach" else 2.0   # exposed walls are worse in a blow
+        out[sp] = half(max(0.0, min(10.0, v)))
+    return out
+
+
+def picks(results):
+    """'Best for ...' choices, so readers can choose even when general scores tie.
+    Returns a list of (kind, species or None, result, value)."""
+    ok = [r for r in results if r.get("best")]
+    out = []
+    seen = []
+    for r in ok:
+        for sp in r["species"]:
+            if sp not in seen:
+                seen.append(sp)
+    for sp in seen:
+        cands = [r for r in ok if sp in r.get("fit", {})]
+        if cands:
+            top = max(cands, key=lambda r: (r["fit"][sp], r["best"]["score"]))
+            if top["fit"][sp] >= 5:          # a poor chance is not a recommendation
+                out.append(("species", sp, top, top["fit"][sp]))
+    out.sort(key=lambda p: -p[3])
+    out = out[:4]
+    if ok:
+        var = max(ok, key=lambda r: (len(r["species"]), r["best"]["score"]))
+        if len({len(r["species"]) for r in ok}) > 1:
+            out.append(("variety", None, var, len(var["species"])))
+        windy = max((r["best"]["wind"] or 0) for r in ok)
+        if windy >= 25:
+            shel = [r for r in ok if r["spot"].get("mouth") or r["spot"].get("type") == "pier"]
+            if shel:
+                out.append(("shelter", None, max(shel, key=lambda r: r["best"]["score"]), round(windy)))
+        night = [r for r in ok if r.get("night")]
+        if night:
+            n = max(night, key=lambda r: r["night"]["score"])
+            if n["night"]["score"] > n["best"]["score"]:
+                out.append(("night", None, n, n["night"]["score"]))
+    return out
+
+
 # ---------- gear tips ----------
 
-def gear_tips(win, rows, species, night=None):
+def gear_tips(win, rows, species, night=None, spot=None):
     """Rule-of-thumb tackle tips from waves, tide and light. Returns
     (target, text key, params); target is "all" or a species key."""
     tips = []
-    wave, rng = win["wave"], win.get("range")
+    wave, tv = win["wave"], win.get("tide_v")
     if wave is not None:
         w = f"{wave:.1f}"
-        if wave >= 1.3 or (rng or 0) > 4.3:
+        if wave >= 1.3 or (tv is not None and tv > 0.83):
             tips.append(("all", "t_lead_heavy", {"wave": w}))
-        elif wave < 0.5 and (rng or 4) <= 3.8:
+        elif wave < 0.5 and (tv is None or tv <= 0.55):
             tips.append(("all", "t_lead_light", {"wave": w}))
         else:
             tips.append(("all", "t_lead_mid", {"wave": w}))
@@ -228,6 +326,8 @@ def gear_tips(win, rows, species, night=None):
     if prev:
         clarity = "clear" if max(prev) < 0.6 else "murky" if max(prev) > 1.0 else None
     if "zeebaars" in species:
+        if (spot or {}).get("mouth"):
+            tips.append(("zeebaars", "t_mouth", {}))
         if wave is not None:
             if wave < 0.4:   tips.append(("zeebaars", "t_bass_calm", {}))
             elif wave < 1.4: tips.append(("zeebaars", "t_bass_surf", {}))
@@ -236,7 +336,7 @@ def gear_tips(win, rows, species, night=None):
             tips.append(("zeebaars", "t_clear" if clarity == "clear" else "t_murky", {}))
         # Spinning: lure type and weight follow wind, waves and light.
         wind, wdir = win.get("wind"), win.get("wdir")
-        onshore = wdir is not None and abs((wdir - SEA_BEARING + 180) % 360 - 180) < 60
+        onshore = wdir is not None and abs((wdir - (spot or {}).get("sea_bearing", SEA_BEARING) + 180) % 360 - 180) < 60
         tips.append(("zeebaars", "t_spin_rod", {}))
         if wave is not None and wind is not None:
             low_light = (win.get("dark") or 0) > 0.1 or (win.get("cloud") or 0) >= 70
